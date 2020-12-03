@@ -36,7 +36,13 @@ $db->exec ("USE ai_game_db");
 			- player_value:		value to be played
 
 		returns:
-			NOT FINISHED
+			- 201:	play succeeded, player and game secret returned as well as new game_state
+			- 400:	no play_value supplied, no play taken
+			  		attempting to repeat a <play_value>, no play taken
+					attempting to play an invalid value for <play_value, no play taken
+					not player's turn, wait for opponent, no play taken
+			- 404:	<player_secret> and <game_secret> combination not found, no game to play for player
+			- 500:	server error, no play occured
 
 -------------------------------------------------------------------------------------------------------
 	new_game: create a new game and join
@@ -44,9 +50,11 @@ $db->exec ("USE ai_game_db");
 		additional keys:
 			- player_secret:	secret of player to add to the new game
 			- new_game_secret:	optional, the secret for the game.
+			- public_data:		optional, set to 0 to keep community from viewing (lame)
+			- public_join:		optional, set to 1 to allow community members to join (cool)
 
 		returns:
-			- 201:	game created, game_secret returned
+			- 201:	game created, game_secret and public_X returned
 			- 400:	no player secret supplied, cannot add player to game, no game created
 			- 400:	player secret not found, does not exist, no game created
 			- 409:	supplied new_game_secret already exists, no game created (optional argument)
@@ -60,7 +68,7 @@ $db->exec ("USE ai_game_db");
 			- game_secret:		secret of the game to join
 
 		returns:
-			- 201:	player added to game
+			- 201:	player added to game, player and game secrets returned
 			- 400:	no player_secret supplied, game not joined
 			- 400:	no game_secret supplied, game not joined
 			- 500:	server error, game not joined
@@ -72,14 +80,255 @@ $db->exec ("USE ai_game_db");
 			- N/A
 
 		returns:
-			- 201:	player created
+			- 201:	player created, player_ecret returned
 			- 500:	server error, player not created
 	
 */
+
+//
+//	Check if a secret exists in the secret_table.
+//
+//	Whitelist for secret_tables:
+//		- players
+//		- games
+//
+//	returns:
+//		array with key-values:
+//			(exists, true/false)
+//			(id, <id of secret)
+//
+function check_secret_exists ($secret, $secret_table)
+{
+	global $db;
+	$ret = array ("count" => 0, "id" => "invalid secret_table");
+
+	if ($secre_table == "players")
+		$qry = "SELECT COUNT(secret) AS count, id FROM players WHERE secret = :secret";
+	else if ($secre_table == "games")
+		$qry = "SELECT COUNT(secret) AS count, id FROM games WHERE secret = :secret";
+	else
+		return $ret;
+
+	$stmt = $db->prepare ($qry);
+	$stmt->execute (array ("secret" => $secret));
+	$fetched = $stmt->fetch (PDO::FETCH_ASSOC);
+	return $fetched;
+}
+//
+//	Get the game state for the game defined byt
+//		- game_id
+//		- player_id
+//		- opponent_id
+//
+//	See if it the player's turn, and get the state of the game at the moment,
+//	considering all completed hands (no peaking if you opponnet played but you haven't
+//	yet).
+//
+//	If you've played more hands than your opponent, you cannot play. Since this is checked
+//	every time, once you played one more than your opponent, you can't play until they
+//	play their hand.
+//
+//	Return:
+//		player_turn:	true if the player can play, else false and they should not
+//		game_state:		array of (player_value, opponent_value, hand_status)
+//						hand_status is: (win, 1), (lose, -1), (tie, 0)
+//						only completed hands can be seen, no peaking at what your opponent played
+//
+//
+function get_game_state ($game_id, $player_id, $opponent_id)
+{
+	global $db;
+	$stmt = $db->prepare
+	("
+		SELECT player_id, play_value
+		FROM game_round_logs
+		WHERE
+			game_id = :game_id
+		ORDER BY
+			id
+	");
+	$stmt->execute (array ("game_id" => $game_id));
+	$game_data = array ($player_id => array (), $opponent_id => array ());
+	while ($row = $stmt->fetch (PDO::FETCH_ASSOC))
+		$game_data[$row['player_id']][] = $row['play_value'];
+
+	$player_count = count ($game_data[$player_id]);
+	$opponent_count = count ($game_data[$opponent_id]);
+	$completed_rounds = min ($player_count, $opponent_count);
+
+	$game_state = array ();
+	for ($i = 0; $i < $completed_rounds; $i++)
+	{
+		// player value, opponent value
+		$pval = $game_data[$player_id][$i];
+		$oval = $game_data[$opponent_id][$i];
+		// win, lose, tie: 1, 0, -1
+		$wlt = ($pval > $oval) ? 1 : (($pval == $oval) ? 0 : -1);
+		$game_state[] = array ($pval, $oval, $wlt);
+	}
+	return array (
+					"player_turn" => ($player_count <= $opponent_count ? true : false),
+					"game_state" => $game_state
+				);
+}
+
 if (isset ($_POST['play_game']))
 {
-	echo "Play game!";
-	exit;
+	// Check if player and game secrets have a record
+	$stmt = $db->prepare
+	("
+		SELECT
+			COUNT(gms.id) AS count,
+			pls.id AS player_id,
+		    gms.id AS game_id,
+			(SELECT players.id
+     			FROM games 
+				LEFT JOIN game_players ON game_players.game_id = games.id
+				LEFT JOIN players ON players.id = game_players.player_id
+     			WHERE games.secret = gms.secret AND players.secret != pls.secret
+				) AS opponent_id
+		FROM games gms
+		LEFT JOIN game_players gmps
+			ON gmps.game_id = gms.id
+		LEFT JOIN players pls
+			ON pls.id = gmps.player_id
+		WHERE
+			pls.secret = :player_secret
+			AND gms.secret = :game_secret
+	");
+	$stmt->execute (array ("player_secret" => $_POST['player_secret'], "game_secret" => $_POST['game_secret']));
+	$fetched = $stmt->fetch (PDO::FETCH_ASSOC);
+	if ($fetched['count'] != 1)
+	{
+		http_response_code (404);
+		echo json_encode
+			(array (
+				"detailed_status" => "Supplied <player_secret>, <game_seret> combination not found.",
+				"player_secret" => $_POST['player_secret'],
+				"game_secret" => $_POST['game_secret']
+			));
+		exit;
+	}
+	// Get game state via ids
+	$player_id = $fetched['player_id'];
+	$game_id = $fetched['game_id'];
+	$opponent_id = $fetched['opponent_id'];
+	$game_state = get_game_state ($game_id, $player_id, $opponent_id);
+
+	// Check existence of play value.
+	if (isset ($_POST['play_value']))
+	{
+		$play_value = $_POST['play_value'];
+		$stmt = $db->prepare ("SELECT play_value FROM game_round_logs"
+							. " WHERE game_id = :game_id AND player_id = :player_id");
+		$stmt->execute (array ("game_id" => $game_id, "player_id" => $player_id));
+		while ($row = $stmt->fetch (PDO::FETCH_ASSOC))
+		{
+			if ($row['play_value'] == $play_value)
+			{
+				http_response_code (400);
+				echo json_encode
+					(array (
+						"detailed_status" => "Repeated <play_value> error, you already played that value.",
+						"play_value" => $play_value,
+						"player_secret" => $_POST['player_secret'],
+						"game_secret" => $_POST['game_secret']
+					));
+				exit;
+			}
+			else if ($play_value < 1 or 7 < $play_value)
+			{
+				http_response_code (400);
+				echo json_encode
+					(array (
+						"detailed_status" => "Incorrect <play_value> error, not between 1 and 7 inclusive.",
+						"play_value" => $play_value,
+						"player_secret" => $_POST['player_secret'],
+						"game_secret" => $_POST['game_secret']
+					));
+				exit;
+			}
+		}
+	}
+	else
+	{
+		http_response_code (400);
+		echo json_encode
+			(array (
+				"detailed_response" => "No <play_value> supplied.",
+				"player_secret" => $_POST['player_secret'],
+				"game_secret" => $_POST['game_secret']
+			));
+		exit;
+	}
+
+	// If it's the players turn, go ahead
+	if ($game_state['player_turn'])
+	{
+		
+		$stmt = $db->prepare
+		("
+			INSERT INTO game_round_logs
+				(game_id, player_id, play_value)
+			VALUES
+				(:game_id, :player_id, :play_value)
+		");
+		if ($stmt->execute (array ("player_id" => $player_id, "game_id" => $game_id,
+									"play_value" => $_POST['play_value'])))
+		{
+			http_response_code (201);
+			$game_state = get_game_state ($game_id, $player_id, $opponent_id)['game_state'];
+			// Check if final hand
+			if (count ($game_state) == 7)
+			{
+				$stmt = $db->prepare ("UPDATE games SET completed = 1 WHERE id = :game_id");
+				$stmt->execute (array ("game_id" => $game_id));
+				echo json_encode
+					(array (
+						"detailed_status" => "Final play made.",
+						"player_secret" => $_POST['player_secret'],
+						"game_secret" => $_POST['game_secret'],
+						"game_state" => get_game_state ($game_id, $player_id, $opponent_id)['game_state']
+					));
+				exit;
+				
+			}
+			else 
+			{
+				echo json_encode
+					(array (
+						"detailed_status" => "Play made.",
+						"player_secret" => $_POST['player_secret'],
+						"game_secret" => $_POST['game_secret'],
+						"game_state" => get_game_state ($game_id, $player_id, $opponent_id)['game_state']
+					));
+				exit;
+			}
+		}
+		else
+		{
+			http_response_code (500);
+			echo json_encode
+				(array (
+					"detailed_status" => "Failed play for <player_secret> in <game_secret>."
+											. " Server error, sorry. Please contact the admin.",
+					"player_secret" => $_POST['player_secret'],
+					"game_secret" => $_POST['game_secret']
+				));
+			exit;
+		}
+	}
+	else
+	{
+		http_response_code (400);
+		echo json_encode
+			(array (
+				"detailed_status" => "Opponent has not played yet, check back later.",
+				"player_secret" => $_POST['player_secret'],
+				"game_secret" => $_POST['game_secret']
+			));
+		exit;
+	}
 }
 else if (isset ($_POST['new_game']))
 {
@@ -128,20 +377,46 @@ else if (isset ($_POST['new_game']))
 			));
 		exit;
 	}
+	$public_data = 1;
+	if (isset ($_POST['public_game']))
+		if ($_post['publice_game'] == 0)
+			$public_data = 0;
+	$public_join = 0;
+	if (isset ($_POST['public_join']))
+		if ($_post['publice_join'] == 1)
+			$public_join = 1;
+
 	// Now to insert!
 	$stmt = $db->prepare
 	("
 		INSERT INTO games
-			(player_id, secret, player_number)
+			(secret, public_data, public_join)
 		VALUES
-			(:player_id, :secret, 1)
+			(:secret, :public_data, :public_join)
 	");
-	if ($stmt->execute (array ("player_id" => $player['id'], "secret" => $secret)))
+	if ($stmt->execute (array ("secret" => $secret,
+								"public_data" => $public_data, "public_join" => $public_join)))
 	{
+		// Get game_id for newly created game.
+		$stmt = $db->prepare ("SELECT id FROM games WHERE secret = :secret");
+		$stmt->execute (array ("secret" => $secret));
+		$game_id = $stmt->fetch (PDO::FETCH_ASSOC)['id'];
+
+		// Insert into game_players
+		$stmt = $db->prepare
+		("
+			INSERT INTO game_players
+				(game_id, player_id)
+			VALUES
+				(:game_id, :player_id)
+		");
+		$stmt->execute (array ("game_id" => $game_id, "player_id" => $player['id']));
 		http_response_code (201);
 		echo json_encode
 			(array (
 				"detailed_status" => "Game created.",
+				"public_data" => $public_data,
+				"public_join" => $public_join,
 				"game_secret" => $secret
 			));
 		exit;
@@ -152,7 +427,7 @@ else if (isset ($_POST['new_game']))
 		echo json_encode
 			(array (
 				"detailed_status" => "Failed to create game for <player_secret>."
-				. " Server error, sorry. Please contact the admin.",
+										. " Server error, sorry. Please contact the admin.",
 				"player_secret" => $_POST['player_secret']
 			));
 		exit;
@@ -190,10 +465,19 @@ else if (isset ($_POST['join_game']))
 	if (isset ($_POST['game_secret']))
 	{
 		// Check if game_secret gives an open game
-		$stmt = $db->prepare ("SELECT COUNT(id) AS cnt FROM games WHERE secret = :secret");
+		$stmt = $db->prepare
+		("
+			SELECT COUNT(gms.id) AS cnt, gms.id 
+			FROM games gms
+			RIGHT JOIN game_players gps
+				ON gps.game_id = gms.id
+			WHERE
+				gms.secret = :secret
+		");
 		$stmt->execute (array ("secret" => $_POST['game_secret']));
 		$fetched = $stmt->fetch (PDO::FETCH_ASSOC);
 		$num_players = $fetched['cnt'];
+		$game_id = $fetched['id'];
 		if ($num_players == 0)
 		{
 			http_response_code (400);
@@ -222,21 +506,21 @@ else if (isset ($_POST['join_game']))
 		exit;
 	}
 
-	// Now insert player id into the game
+	// Now insert player_id and game_id into the game_players
 	$stmt = $db->prepare
 	("
-		INSERT INTO games
-			(player_id, player_number, secret)
+		INSERT INTO game_players
+			(player_id, game_id)
 		VALUES
-			(:player_id, 2, :secret)
+			(:player_id, :game_id)
 	");
-	if ($stmt->execute (array ("player_id" => $player_id, "secret" => $_POST['game_secret'])))
+	if ($stmt->execute (array ("player_id" => $player_id, "game_id" => $game_id)))
 	{
 		http_response_code (201);
 		echo json_encode
 			(array (
 				"detailed_status" => "Player added to game.",
-				"player_secret" => $_POST['player_secreet'],
+				"player_secret" => $_POST['player_secret'],
 				"game_secret" => $_POST['game_secret']
 			));
 		exit;
@@ -258,8 +542,8 @@ else if (isset ($_POST['new_player']))
 {
 	$secret = password_hash (time (), PASSWORD_DEFAULT);
 
-	$stmt = $db->prepare ("INSERT INTO players (player, secret) VALUES (:player, :secret)");
-	if ($stmt->execute (array ("player" => $_POST['new_player'], "secret" => $secret)))
+	$stmt = $db->prepare ("INSERT INTO players (name, secret) VALUES (:name, :secret)");
+	if ($stmt->execute (array ("name" => $_POST['new_player'], "secret" => $secret)))
 	{
 		http_response_code (201);
 		echo json_encode
