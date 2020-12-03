@@ -1,0 +1,11 @@
+# linus swap files
+*.swp
+
+# Compiled c programs
+a.out
+*.x
+
+# Output/Data, Various
+*.dat
+*.txt
+
