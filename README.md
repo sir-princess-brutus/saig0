@@ -1,5 +1,11 @@
 # saig0: Shit AI Game V0
 
+## Server/Game Status
+
+The game is currently hosted on gixinc.com and can be played there, see test_play.py.
+
+During this initial testing, the database will likely get deleted often, but will be available to play and use.
+
 ## Project Overview
 
 This project is a simple game to play with backend RESTful APIs (for me, the author and any contributors), and to AI/Machine Learning for everyone.
