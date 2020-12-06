@@ -8,11 +8,9 @@
 
 	These should probably be split at some point, perhaps into several
 	files depending on what is asked for. 
-*/
-$db = new PDO ("mysql:host=localhost", "php_api", "super-secret-password");
-$db->setAttribute (PDO::ATTR_ERRMODE, PDO::ERRMODE_WARNING);
-$db->exec ("SET ROLE ai_game");
-$db->exec ("USE ai_game_db");
+ */
+include ("/var/www/phplib/ai_game_db_login.php");
+$db = login_saig0_mariadb ();
 
 /*
 	POST methods
