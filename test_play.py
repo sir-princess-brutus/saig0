@@ -14,7 +14,9 @@
 
 import requests, json, random
 
-url_endpoint = "http://localhost/ai/game.php"
+url_endpoint = "https://gixinc.com/ai/game.php"
+# Not entirely sure why SSL isn't working, but it isn't.
+url_endpoint = "http://gixinc.com/ai/game.php"
 
 def print_simp_resp (response, title):
 	"""
@@ -100,8 +102,8 @@ def make_play (player, title = "Making a play."):
 
 # each player plays
 for i in range (7):
-	make_play (player_one, "Player One, Hand " + str (i))
-	make_play (player_two, "Player Two, Hand " + str (i))
+	make_play (player_one, "Player One, Hand " + str (i + 1))
+	make_play (player_two, "Player Two, Hand " + str (i + 1))
 
 # Did some testing on players trying to go twice, or sending in a repeated
 # value, and it passed so far.
