@@ -17,12 +17,13 @@ The game is defined below:
   * Once a number has been played, it is removed from the players hand and cannot be played again.
   * Play continues until both players have no numbers in their hand.
 
-## Brief File Notes
+## Current State
 
-The file test_play.py can be used to see available features and examples. It just posts to ai/game.php on the gixinc.com server.
+The Python3 scripts saig0_lib.py and lib_example_use.py can show how to play the game simply. 
 
-1. ai/game.php: The main game file that handles POST requests (only at the moment, GET to come soon).
-2. test_play.py: A python script that plays a game between two new players randomly choosing numbers.
-3. ai_game_db.sql: A blank database for setting up a server (does not include users/roles for login).
-4. analysis/win_loss_tie.c: A C program that calculates the number of gae configurations for a number of hands.
-5. setup.sh: Copies web pages to folders on server--not really necessary.
+Most of the files are leftovers and part of half-formed changes in organization. The releveant and important piece are :
+* saig0.php: The main game program, a RESTful API interface.
+* saig0_lib.py: The client library for playing the game, or code your own requests interface!
+* db_4_ai_game.sql: A blank database if you want to play with it on your own server.
+
+All other files are part of thinking about the best way to organize URL endpoints, apologies for the clutter.
