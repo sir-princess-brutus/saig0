@@ -50,9 +50,11 @@ $db = login_saig0_mariadb ();
 			- new_game_secret:	optional, the secret for the game.
 			- public_data:		optional, set to 0 to keep community from viewing (lame)
 			- public_join:		optional, set to 1 to allow community members to join (cool)
+			- game_name:		optional, if not included then time () is used as the name
 
 		returns:
 			- 201:	game created, game_secret and public_X returned
+			- 400:	game name already in use, no game created
 			- 400:	no player secret supplied, cannot add player to game, no game created
 			- 400:	player secret not found, does not exist, no game created
 			- 409:	supplied new_game_secret already exists, no game created (optional argument)
@@ -63,7 +65,7 @@ $db = login_saig0_mariadb ();
 
 		additional keys:
 			- player_secret:	secret of player joining game
-			- game_secret:		secret of the game to join
+			- game_name:		name of the game to join
 
 		returns:
 			- 201:	player added to game, player and game secrets returned
@@ -75,7 +77,7 @@ $db = login_saig0_mariadb ();
 	new_player: create a new player
 
 		additional_keys:
-			- N/A
+			- username:			username for the new player, can be omitted.
 
 		returns:
 			- 201:	player created, player_ecret returned
@@ -354,6 +356,21 @@ else if (isset ($_POST['new_game']))
 			));
 		exit;
 	}
+
+	// Set game name, check if in db
+	$game_name = $_POST['game_name'] ?? time ();
+	$stmt = $db->prepare ("SELECT COUNT(id) AS cnt FROM games WHERE game_name = :game_name");
+	$stmt->execute (array ("game_name" => $game_name));
+	if ($stmt->fetch (PDO::FETCH_ASSOC)['cnt'] > 0)
+	{
+		http_response_code (400);
+		echo json_encode
+			(array (
+				"detailed_status" => "Supplied <game_name> already exists. Leave blank to use time as name."
+			));
+		exit;
+	}
+
 	// Set the secret from user, or as hashed time. 
 	$secret = "";
 	if (isset ($_POST['new_game_secret']))
@@ -388,12 +405,18 @@ else if (isset ($_POST['new_game']))
 	$stmt = $db->prepare
 	("
 		INSERT INTO games
-			(secret, public_data, public_join)
+			(secret, public_data, public_join, game_name)
 		VALUES
-			(:secret, :public_data, :public_join)
+			(:secret, :public_data, :public_join, :game_name)
 	");
-	if ($stmt->execute (array ("secret" => $secret,
-								"public_data" => $public_data, "public_join" => $public_join)))
+	if ($stmt->execute
+			(array (
+				"secret" => $secret,
+				"public_data" => $public_data,
+				"public_join" => $public_join,
+				"game_name" => $game_name
+			))
+		)
 	{
 		// Get game_id for newly created game.
 		$stmt = $db->prepare ("SELECT id FROM games WHERE secret = :secret");
@@ -415,7 +438,8 @@ else if (isset ($_POST['new_game']))
 				"detailed_status" => "Game created.",
 				"public_data" => $public_data,
 				"public_join" => $public_join,
-				"game_secret" => $secret
+				"game_secret" => $secret,
+				"game_name" => $game_name
 			));
 		exit;
 	}
@@ -460,7 +484,7 @@ else if (isset ($_POST['join_game']))
 			));
 		exit;
 	}
-	if (isset ($_POST['game_secret']))
+	if (isset ($_POST['game_name']))
 	{
 		// Check if game_secret gives an open game
 		$stmt = $db->prepare
@@ -470,9 +494,9 @@ else if (isset ($_POST['join_game']))
 			RIGHT JOIN game_players gps
 				ON gps.game_id = gms.id
 			WHERE
-				gms.secret = :secret
+				gms.game_name = :game_name
 		");
-		$stmt->execute (array ("secret" => $_POST['game_secret']));
+		$stmt->execute (array ("game_name" => $_POST['game_name']));
 		$fetched = $stmt->fetch (PDO::FETCH_ASSOC);
 		$num_players = $fetched['cnt'];
 		$game_id = $fetched['id'];
@@ -481,8 +505,8 @@ else if (isset ($_POST['join_game']))
 			http_response_code (400);
 			echo json_encode
 				(array (
-					"detailed_status" => "Supplied <game_secret> not found.",
-					"game_Secret" => $_POST['game_secret']
+					"detailed_status" => "Supplied <game_name> not found.",
+					"game_name" => $_POST['game_name']
 				));
 			exit;
 		}
@@ -491,8 +515,8 @@ else if (isset ($_POST['join_game']))
 			http_response_code (400);
 			echo json_encode
 				(array (
-					"detailed_status" => "Supplied <game_secret>  already full.",
-					"game_Secret" => $_POST['game_secret']
+					"detailed_status" => "Supplied <game_name> already full.",
+					"game_name" => $_POST['game_name']
 				));
 			exit;
 		}
@@ -500,7 +524,7 @@ else if (isset ($_POST['join_game']))
 	else
 	{
 		http_response_code (400);
-		echo json_encode (array ("detailed_status" => "No <game_secret> supplied."));
+		echo json_encode (array ("detailed_status" => "No <game_name> supplied."));
 		exit;
 	}
 
@@ -538,10 +562,12 @@ else if (isset ($_POST['join_game']))
 }
 else if (isset ($_POST['new_player']))
 {
+	$username = $_POST['username'] ?? "default_username";
+	$username = str_replace (" ", "_", $username);
 	$secret = password_hash (time (), PASSWORD_DEFAULT);
 
-	$stmt = $db->prepare ("INSERT INTO players (name, secret) VALUES (:name, :secret)");
-	if ($stmt->execute (array ("name" => $_POST['new_player'], "secret" => $secret)))
+	$stmt = $db->prepare ("INSERT INTO players (username, secret) VALUES (:username, :secret)");
+	if ($stmt->execute (array ("username" => $_POST['new_player'], "secret" => $secret)))
 	{
 		http_response_code (201);
 		echo json_encode
