@@ -21,7 +21,7 @@ The game is defined below:
 
 The Python3 scripts saig0_lib.py and lib_example_use.py can show how to play the game simply. 
 
-Most of the files are leftovers and part of half-formed changes in organization. The releveant and important piece are :
+Most of the files are leftovers and part of half-formed changes in organization. The releveant and important piece are:
 * saig0.php: The main game program, a RESTful API interface.
 * saig0_lib.py: The client library for playing the game, or code your own requests interface!
 * db_4_ai_game.sql: A blank database if you want to play with it on your own server.
