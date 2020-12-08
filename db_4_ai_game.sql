@@ -1,8 +1,8 @@
--- MySQL dump 10.17  Distrib 10.3.25-MariaDB, for debian-linux-gnu (x86_64)
+-- MySQL dump 10.17  Distrib 10.3.17-MariaDB, for Linux (x86_64)
 --
 -- Host: localhost    Database: ai_game_db
 -- ------------------------------------------------------
--- Server version	10.3.25-MariaDB-0ubuntu0.20.04.1
+-- Server version	10.3.17-MariaDB
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -82,8 +82,10 @@ CREATE TABLE `games` (
   `public_join` tinyint(4) NOT NULL COMMENT 'Zero to disable public players from joining.',
   `completed` tinyint(4) NOT NULL DEFAULT 0,
   `secret` varchar(255) NOT NULL,
+  `game_name` varchar(255) NOT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `secret` (`secret`)
+  UNIQUE KEY `secret` (`secret`),
+  UNIQUE KEY `game_name` (`game_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -105,11 +107,12 @@ DROP TABLE IF EXISTS `players`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `players` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `name` text NOT NULL,
+  `username` varchar(50) NOT NULL,
   `timestamp` datetime NOT NULL DEFAULT current_timestamp(),
   `secret` varchar(255) NOT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `secret` (`secret`)
+  UNIQUE KEY `secret` (`secret`),
+  UNIQUE KEY `username` (`username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -131,4 +134,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2020-12-02 22:34:32
+-- Dump completed on 2020-12-08  4:56:20
