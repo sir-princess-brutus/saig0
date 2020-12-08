@@ -9,3 +9,5 @@ a.out
 *.dat
 *.txt
 
+# PyCache folders
+*__pycache__*
