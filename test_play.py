@@ -14,9 +14,7 @@
 
 import requests, json, random
 
-url_endpoint = "https://gixinc.com/ai/game.php"
-# Not entirely sure why SSL isn't working, but it isn't.
-url_endpoint = "http://gixinc.com/ai/game.php"
+url_endpoint = "http://gixinc.com/saig0.php"
 
 def print_simp_resp (response, title):
 	"""
