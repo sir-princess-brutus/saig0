@@ -194,18 +194,18 @@ if (isset ($_POST['play_game']))
 			ON pls.id = gmps.player_id
 		WHERE
 			pls.secret = :player_secret
-			AND gms.secret = :game_secret
+			AND gms.game_name = :game_name
 	");
-	$stmt->execute (array ("player_secret" => $_POST['player_secret'], "game_secret" => $_POST['game_secret']));
+	$stmt->execute (array ("player_secret" => $_POST['player_secret'], "game_name" => $_POST['game_name']));
 	$fetched = $stmt->fetch (PDO::FETCH_ASSOC);
 	if ($fetched['count'] != 1)
 	{
 		http_response_code (404);
 		echo json_encode
 			(array (
-				"detailed_status" => "Supplied <player_secret>, <game_seret> combination not found.",
+				"detailed_status" => "Supplied <player_secret>, <game_name> combination not found.",
 				"player_secret" => $_POST['player_secret'],
-				"game_secret" => $_POST['game_secret']
+				"game_name" => $_POST['game_name']
 			));
 		exit;
 	}
@@ -401,6 +401,10 @@ else if (isset ($_POST['new_game']))
 		if ($_post['publice_join'] == 1)
 			$public_join = 1;
 
+	// Private data not yet implemented.
+	$public_data = 1;
+	// Private joins not yet implemented.
+	$public_join = 01;
 	// Now to insert!
 	$stmt = $db->prepare
 	("
@@ -435,7 +439,7 @@ else if (isset ($_POST['new_game']))
 		http_response_code (201);
 		echo json_encode
 			(array (
-				"detailed_status" => "Game created.",
+				"detailed_status" => "Game created. Note private games and private data are not implemented.",
 				"public_data" => $public_data,
 				"public_join" => $public_join,
 				"game_secret" => $secret,
@@ -486,7 +490,7 @@ else if (isset ($_POST['join_game']))
 	}
 	if (isset ($_POST['game_name']))
 	{
-		// Check if game_secret gives an open game
+		// Check if game_name gives an open game
 		$stmt = $db->prepare
 		("
 			SELECT COUNT(gms.id) AS cnt, gms.id 
@@ -543,7 +547,7 @@ else if (isset ($_POST['join_game']))
 			(array (
 				"detailed_status" => "Player added to game.",
 				"player_secret" => $_POST['player_secret'],
-				"game_secret" => $_POST['game_secret']
+				"game_name" => $_POST['game_name']
 			));
 		exit;
 	}
@@ -589,6 +593,37 @@ else if (isset ($_POST['new_player']))
 	}
 }
 else
-	echo "<center style = 'margin: 50px;'><h1>Kesha will find you.</h1></center>\n";
+{
+	$stmt = $db->prepare
+	("
+		SELECT
+			gps.game_id, 
+			gps.player_id
+		FROM game_players gps
+		LEFT JOIN games gms
+			ON gms.id = gps.game_id
+		WHERE
+			gms.public_data = 1
+			AND gms.completed = 1
+	");
+	$game_ids = array ();
+	$stmt->execute ();
+	while ($row = $stmt->fetch (PDO::FETCH_ASSOC))
+		if (array_key_exists ($row['game_id'], $game_ids))
+			$game_ids[$row['game_id']][] = $row['player_id'];
+		else
+			$game_ids[$row['game_id']] = array ($row['player_id']);
+	$games = array ();
+	foreach ($game_ids as $game_id => $player_ids)
+		$games[] = get_game_state ($game_id, $player_ids[0], $player_ids[1]);
+
+	$num_games = count ($games);
+	echo json_encode
+		(array (
+			"detailed_status" => "Collected {$num_games} games for you.",
+			"games" => $games
+		));
+	exit;
+}
 
 ?>
