@@ -1,7 +1,4 @@
 #!/bin/bash
 
-echo "cp -r ai/ /var/www/html/"
-cp -r ai/ /var/www/html/
-
-echo "cp -r game/ /var/www/html/"
-cp -r game/ /var/www/html/
+echo "cp saig0.php /var/www/html"
+cp saig0.php /var/www/html
