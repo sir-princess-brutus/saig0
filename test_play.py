@@ -12,9 +12,9 @@
 
 """
 
-import requests, json, random
+import requests, json, random, time
 
-url_endpoint = "http://gixinc.com/saig0.php"
+url_endpoint = "http://gixinc.com/saig0/saig0.php"
 
 def print_simp_resp (response, title):
 	"""
@@ -35,7 +35,7 @@ def print_simp_resp (response, title):
 
 new_player_data =\
 {
-	"new_player": "Player One"
+	"new_player": "Player One " + str (time.time ())
 }
 
 r = requests.post (url_endpoint, data = new_player_data)
@@ -43,7 +43,7 @@ print_simp_resp (r, "Player One")
 player_one = json.loads (r.text)
 del player_one['detailed_status']
 
-new_player_data['new_player'] = "Player Two"
+new_player_data['new_player'] = "Player Two " + str (time.time ())
 r = requests.post (url_endpoint, data = new_player_data)
 print_simp_resp (r, "Player Two")
 player_two = json.loads (r.text)
@@ -56,12 +56,13 @@ del player_two['detailed_status']
 new_game_data =\
 {
 	"new_game": True,
-	"player_secret": player_one['player_secret']
+	"player_secret": player_one['player_secret'],
+        "game_name": "Test game " + str (time.time ())
 } # Not passing new_game_secret, using default
 r = requests.post (url_endpoint, data = new_game_data)
 print_simp_resp (r, "Player One Create Game")
 r_dict = json.loads (r.text)
-player_one['game_secret'] = r_dict['game_secret']
+player_one['game_name'] = r_dict['game_name']
 
 ######################################################################################
 # Player Two Joins The Game
@@ -70,7 +71,7 @@ player_one['game_secret'] = r_dict['game_secret']
 join_game_data =\
 {
 	"join_game": True,
-	"game_secret": player_one['game_secret'],
+	"game_name": player_one['game_name'],
 	"player_secret": player_two['player_secret']
 }
 r = requests.post (url_endpoint, data = join_game_data)
@@ -88,7 +89,7 @@ player_two['hand'] = list (range (1, 8))
 play_game_data =\
 {
 	"play_game": True,
-	"game_secret": player_one['game_secret']
+	"game_name": player_one['game_name']
 }
 
 # make a play, and print
