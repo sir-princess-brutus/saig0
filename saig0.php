@@ -51,6 +51,7 @@ $db = login_saig0_mariadb ();
 			- public_data:		optional, set to 0 to keep community from viewing (lame)
 			- public_join:		optional, set to 1 to allow community members to join (cool)
 			- game_name:		optional, if not included then time () is used as the name
+			- ai_game:			optional, if included, play against the ai daemon
 
 		returns:
 			- 201:	game created, game_secret and public_X returned
@@ -400,11 +401,13 @@ else if (isset ($_POST['new_game']))
 	if (isset ($_POST['public_join']))
 		if ($_post['publice_join'] == 1)
 			$public_join = 1;
-
+	$ai_game = 0;
+	if (isset ($_POST['ai_game']))
+		$ai_game = 1;
 	// Private data not yet implemented.
 	$public_data = 1;
 	// Private joins not yet implemented.
-	$public_join = 01;
+	$public_join = 1;
 	// Now to insert!
 	$stmt = $db->prepare
 	("
@@ -443,8 +446,11 @@ else if (isset ($_POST['new_game']))
 				"public_data" => $public_data,
 				"public_join" => $public_join,
 				"game_secret" => $secret,
-				"game_name" => $game_name
+				"game_name" => $game_name,
+				"ai_game" => $ai_game
 			));
+		if ($ai_game == 1)
+			shell_exec ("/var/www/saig0_daemon/random_play_daemon.py " . $game_Name . " 2>&1 > /dev/null");
 		exit;
 	}
 	else
