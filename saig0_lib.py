@@ -116,7 +116,7 @@ class saig0_player:
         r = requests.post (self.url_endpoint, data = post_data)
         if (r.status_code != 201):
             print ("ERROR: Failed to make play:\n", r.text)
-            return r
+        return r
 
     def get_games_from_database (self):
         """
@@ -145,7 +145,7 @@ class saig0_player:
             Initialize a hand: list [1... 7]
         """
         self.hand = list (range (1, 8))
-
+        self.game = []
     def play_random_number (self):
         """
             Play a random number in the current game
