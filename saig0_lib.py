@@ -64,15 +64,22 @@ class saig0_player:
         with open (self.filename, "w") as f:
             f.write (f"username {self.username}\nsecret {self.secret}")
 
-    def create_new_game (self, game_name = None):
+    def create_new_game (self, game_name = None, ai_game = False):
         """
             Create a new game, return the game_name for others to join.
         """
         if (game_name == None):
             game_name = "default_game_name" + str (time.time ())
         self.cur_game_name = game_name
-        r = requests.post (self.url_endpoint,
-         data = {"new_game": True, "player_secret": self.secret, "game_name": self.cur_game_name})
+        data =\
+        {
+            "new_game": True,
+            "player_secret": self.secret,
+            "game_name": self.cur_game_name
+        }
+        if (ai_game):
+            data['ai_game'] = True
+        r = requests.post (self.url_endpoint, data)
         if (r.status_code != 201):
             print ("Failed to create game:\n", r.text)
             return r
