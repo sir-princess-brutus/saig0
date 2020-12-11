@@ -150,9 +150,11 @@ class saig0_player:
         play_value = self.hand.pop (random.randint (0, len (self.hand) - 1))
         r = requests.post (self.url_endpoint, data = {"play_game": True, "game_name": self.cur_game_name,
                                                     "player_secret": self.secret, "play_value": play_value})
+        # Check if play was accepted
         if (r.status_code != 201):
-            print ("ERROR: Failed to make play:\n", r.text)
-            return 1
+            return [1, r]
+        else:
+            return [0, r]
 
     def pretty_print_game (self, game_list):
         """
