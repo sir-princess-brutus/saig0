@@ -111,11 +111,14 @@ class saig0_player:
             print ("ERROR: No game joined, join a game first.")
             return 1
 
-        post_data = {"play_game": True, "game_secret": self.cur_game_secret, "player_secret": self.secret,
+        post_data = {"play_game": True, "game_name": self.cur_game_name, "player_secret": self.secret,
                         "play_value": value}
         r = requests.post (self.url_endpoint, data = post_data)
         if (r.status_code != 201):
             print ("ERROR: Failed to make play:\n", r.text)
+            return r
+        response_data = json.loads (r.text)
+        self.game = response_data['game_state']
         return r
 
     def get_games_from_database (self):
