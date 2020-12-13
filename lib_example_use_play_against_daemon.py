@@ -5,7 +5,7 @@
 
 # Import the saig0 library
 import saig0_lib as sl
-import json
+import json, time, random
 
 # Create player and Load data if available
 player = sl.saig0_player ("Myspace Tom", "myspace_tom.dat")
@@ -24,15 +24,18 @@ def make_a_play (player_in):
     """
         Make a play in the current game
     """
-    response = player_in.play_game_round (7 - len (play_in.game))
+    response = player_in.play_game_round (7 - len (player_in.game))
     if (response.status_code == 201):
         player_in.game = json.loads (response.text)['game_state']
+        return True
+    else:
+        return False
 
 
 # Play 7 rounds.
 for i in range (7):
-    make_a_play (player_in)
-    time.sleep (3.0 * random.random ())
+    while (make_a_play (player) == False):
+        time.sleep (3.0 * random.random ())
 
 
 all_games = player.get_games_from_database ()
