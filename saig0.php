@@ -450,7 +450,7 @@ else if (isset ($_POST['new_game']))
 				"ai_game" => $ai_game
 			));
 		if ($ai_game == 1)
-			shell_exec ("/var/www/saig0_daemon/random_play_daemon.py " . $game_Name . " 2>&1 > /dev/null");
+			shell_exec ("/var/www/saig0_daemon/random_play_daemon.py " . $game_name . " 2>&1 > /dev/null");
 		exit;
 	}
 	else
