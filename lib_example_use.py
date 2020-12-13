@@ -31,8 +31,8 @@ player_two.initialize_hand ()
 
 #Play 7 rounds.
 for i in range (7):
-    player_one.play_random_number ()
-    player_two.play_random_number ()
+    print (player_one.play_random_number ()[1].text)
+    print (player_two.play_random_number ()[1].text)
 
 
 all_games = player_two.get_games_from_database ()
